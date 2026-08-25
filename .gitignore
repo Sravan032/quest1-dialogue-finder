@@ -1,8 +1,26 @@
-.venv/
+# Python
 __pycache__/
-*.pyc
+*.py[cod]
+*.pyo
 
+# Virtual environment
+.venv/
+venv/
+
+# Generated data
 data/videos/
+data/transcriptions/
 data/frames/
+data/test/
+data/subtitles/
 
-.env
+# OCR test video
+data/ocr_test.mp4
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db

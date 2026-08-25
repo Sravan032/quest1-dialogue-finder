@@ -1,0 +1,4 @@
+easyocr==1.7.2
+faster-whisper==1.2.1
+opencv-python==5.0.0.93
+yt-dlp==2026.8.19

@@ -1,6 +1,5 @@
 import cv2
 
-
 class FrameMapper:
 
     def get_fps(self, video_path):

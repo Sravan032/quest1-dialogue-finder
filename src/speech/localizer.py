@@ -2,7 +2,8 @@ from difflib import SequenceMatcher
 from faster_whisper import WhisperModel
 import json
 from pathlib import Path
-
+from src.speech.aligner import WordAligner
+from src.core.exceptions import TranscriptionError
 
 class SpeechLocalizer:
 
@@ -17,6 +18,7 @@ class SpeechLocalizer:
             device=device,
             compute_type=compute_type
         )
+        self.aligner = WordAligner()
 
     def normalize(self, text):
         return " ".join(
@@ -35,12 +37,17 @@ class SpeechLocalizer:
         ).ratio()
 
     def transcribe(self, video_path):
+        try:
+            segments, info = self.model.transcribe(
+                video_path,
+                beam_size=5,
+                word_timestamps=True
+            )
+        except Exception as e:
 
-        segments, info = self.model.transcribe(
-            video_path,
-            beam_size=5,
-            word_timestamps=True
-        )
+            raise TranscriptionError(
+                f"Transcription failed: {e}"
+            ) from e
 
         results = []
 
@@ -97,29 +104,75 @@ class SpeechLocalizer:
 
             return json.load(file)
 
-    def find_dialogue(self, segments, target):
+    def find_dialogue(self, segments, target, max_window=3):
 
-        best_segment = None
+        best_match = None
         best_score = 0.0
 
-        for segment in segments:
+        for start_index in range(len(segments)):
 
-            score = self.similarity(
-                target,
-                segment["text"]
-            )
+            combined_text = ""
 
-            if score > best_score:
-                best_score = score
-                best_segment = segment
+            for window_size in range(1, max_window + 1):
 
-        if best_segment is None:
+                end_index = start_index + window_size
+
+                if end_index > len(segments):
+                    break
+
+                segment_window = segments[
+                    start_index:end_index
+                ]
+
+                combined_text = " ".join(
+                    segment["text"]
+                    for segment in segment_window
+                )
+
+                score = self.similarity(
+                    target,
+                    combined_text
+                )
+
+                if score > best_score:
+
+                    best_score = score
+
+                    first_segment = segment_window[0]
+                    last_segment = segment_window[-1]
+
+                    # Combine all word timestamps
+                    words = []
+
+                    for segment in segment_window:
+                        words.extend(
+                            segment["words"]
+                        )
+
+                    alignment = self.aligner.align(
+                        target,
+                        words
+                    )
+
+                    dialogue_start = None
+
+                    if alignment:
+                        dialogue_start = alignment["start_word"]["start"]
+
+                    best_match = {
+                        "score": score,
+                        "segment_start": first_segment["start"],
+                        "segment_end": last_segment["end"],
+                        "dialogue_start": dialogue_start,
+                        "dialogue_end": words[-1]["end"] if words else None,
+                        "text": combined_text,
+                        "words": words
+                    }
+
+        if best_match is None:
             return None
 
-        return {
-            "score": best_score,
-            "start": best_segment["start"],
-            "end": best_segment["end"],
-            "text": best_segment["text"],
-            "words": best_segment["words"]
-        }
+        if best_match["score"] < 0.70:
+            return None
+
+        return best_match
