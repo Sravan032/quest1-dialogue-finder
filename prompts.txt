@@ -1,0 +1,651 @@
+QUEST1 DIALOGUE FINDER
+AI-ASSISTED DEVELOPMENT PROMPTS
+================================
+
+This file contains the main prompts and discussion directions used during
+the development of Quest1 Dialogue Finder.
+
+AI was used mainly as an interactive engineering assistant. I used it to
+discuss approaches, understand unfamiliar concepts, debug problems, design
+tests, compare alternatives, and improve the implementation.
+
+The project was developed iteratively rather than generating the complete
+application in one step.
+
+
+============================================================
+1. UNDERSTANDING THE PROBLEM
+============================================================
+
+"I have attached the problem statement. My initial thought is that we can
+extract subtitles/transcription from the video, find where the dialogue
+appears, get its timestamp, and then convert that timestamp into a frame.
+Is this a good approach?"
+
+"What are the main technical challenges with this approach?"
+
+"Before writing code, can we break this problem into smaller components?"
+
+"Which parts should I implement first so that I can test the idea step by
+step?"
+
+"Let's keep the solution practical. I don't want to add unnecessary
+complexity."
+
+
+============================================================
+2. STARTING WITH SPEECH
+============================================================
+
+"Can we use faster-whisper to get the dialogue timestamps?"
+
+"Does Whisper give timestamps for individual words or only complete
+segments?"
+
+"If a Whisper segment is several seconds long, the dialogue might start
+in the middle of it. How can we get a more accurate start time?"
+
+"Let's first implement speech localization and see how accurate it is
+before adding OCR."
+
+"Can you explain what word_timestamps=True actually gives us?"
+
+
+============================================================
+3. HANDLING WHISPER TRANSCRIPTION MISTAKES
+============================================================
+
+"Whisper may not return the exact same text as the target dialogue. For
+example, the target is 'My mind rebels at stagnation' but Whisper gives
+'My mind rebels its stagnation'. How can we still match them?"
+
+"Do we need a complicated semantic model for this or can we start with
+something simple?"
+
+"Would SequenceMatcher be enough for this kind of fuzzy text matching?"
+
+"What should happen if the best match has a very low score?"
+
+"I don't want a completely unrelated sentence to be accepted just because
+it is the best result. How should we handle that?"
+
+
+============================================================
+4. WORD-LEVEL ALIGNMENT
+============================================================
+
+"I have the words and their timestamps from Whisper now. How can I find the
+exact word where the target dialogue starts?"
+
+"Can we keep this separate from SpeechLocalizer?"
+
+"Let's make a WordAligner class so I can test it independently."
+
+"I want to test a case where the target dialogue starts somewhere in the
+middle of a segment."
+
+"The test is giving me KeyError: 'words'. Can you look at the error and
+tell me whether the problem is in the implementation or in the test data?"
+
+"Okay, let's fix the test data instead of changing the production code if
+the production data structure is correct."
+
+
+============================================================
+5. THINKING ABOUT OCR
+============================================================
+
+"Speech gives us a timestamp, but the video might also have subtitles.
+Could OCR help us get a more accurate frame?"
+
+"I don't think running OCR over the whole video makes sense. Can we use
+the speech timestamp to restrict the OCR search?"
+
+"How much of a time window should we search around the speech result?"
+
+"Let's make OCR a separate component rather than putting it inside the
+speech code."
+
+
+============================================================
+6. BUILDING THE OCR COMPONENT
+============================================================
+
+"Let's create an OCRReader using EasyOCR. It should take a frame and give
+me the detected text and confidence."
+
+"How should I compare the OCR text with the target dialogue?"
+
+"OCR can also make mistakes, so can we use fuzzy matching here too?"
+
+"Let's create OCRSearcher separately from OCRReader. I want the OCR reader
+to only deal with reading text, and the searcher to deal with finding the
+dialogue."
+
+
+============================================================
+7. TESTING OCR SEPARATELY
+============================================================
+
+"Before connecting OCR to the real movie, can we create a small test video
+with known text?"
+
+"I want to test whether OCR can find an exact visual dialogue."
+
+"Can we also test a small OCR typo?"
+
+"Let's make sure these tests work before connecting OCR to the main
+pipeline."
+
+"Okay, the OCR component works. Now let's connect it to the speech result."
+
+
+============================================================
+8. COARSE-TO-FINE SEARCH
+============================================================
+
+"If I check OCR on every frame, this is going to be very slow. What is a
+better approach?"
+
+"Can we first sample frames every 0.2 or 0.5 seconds and find an approximate
+location?"
+
+"Then once we find the likely timestamp, can we search frame-by-frame in a
+small window around it?"
+
+"Let's implement this as coarse search followed by fine search."
+
+"How can I measure how much time the coarse and fine searches actually
+take?"
+
+
+============================================================
+9. OCR PERFORMANCE
+============================================================
+
+"The OCR coarse search is taking around 48 seconds on my machine. That's
+too slow."
+
+"Can we increase the sampling interval and see whether we still get the
+same result?"
+
+"Let's add timing around the OCR search so I can compare before and after."
+
+"After changing the sampling interval, it is around 19 seconds and still
+gives the same result. Is that a reasonable trade-off?"
+
+"Let's keep the optimization if the accuracy is not affected."
+
+
+============================================================
+10. COMBINING SPEECH AND OCR
+============================================================
+
+"Now I have a speech result and an OCR result. How should I decide which
+one to use?"
+
+"I think OCR should win when it finds the dialogue visually because it can
+give us a more precise frame."
+
+"But if the video doesn't have subtitles, OCR won't find anything. Speech
+should be the fallback."
+
+"Should we put this decision into a separate LocalizationFusion class?"
+
+"Let's test OCR wins and speech fallback separately."
+
+
+============================================================
+11. OCR FAILURE HANDLING
+============================================================
+
+"What if OCR itself throws an exception? I don't want the whole application
+to fail."
+
+"Can the application simply fall back to speech localization if visual
+search fails?"
+
+"Let's add a test specifically for OCR failure falling back to speech."
+
+"I want the final pipeline to still produce a frame even when OCR is not
+available."
+
+
+============================================================
+12. TIMESTAMP TO FRAME
+============================================================
+
+"Once we have the final timestamp, how exactly do we convert it into a
+frame?"
+
+"If the video is 24 FPS and the timestamp is 324.56 seconds, what frame
+should we select?"
+
+"Let's create a FrameMapper class for timestamp-to-frame and
+frame-to-timestamp conversion."
+
+"I also want to calculate how much error there is between the requested
+timestamp and the actual frame timestamp."
+
+"Let's print that error in the final output."
+
+
+============================================================
+13. SAVING THE FINAL FRAME
+============================================================
+
+"I have the final frame number now. How should I save that frame as an
+image?"
+
+"Let's keep frame extraction separate from FrameMapper."
+
+"I want the final frame to be saved under the video ID so that different
+videos don't overwrite each other."
+
+"Can the application print the path of the saved frame at the end?"
+
+
+============================================================
+14. VIDEO DOWNLOADING
+============================================================
+
+"I need to download the video from the URL. Can we use yt-dlp?"
+
+"Let's make a VideoDownloader class instead of putting yt-dlp directly
+inside main.py."
+
+"What should happen if the download fails?"
+
+"Can we create a custom VideoDownloadError?"
+
+"If the video already exists locally, I don't want to download it again."
+
+
+============================================================
+15. CACHING
+============================================================
+
+"Whisper takes a while to transcribe the video. I don't want to do that
+every time I run the application."
+
+"Can we save the transcription to JSON?"
+
+"On the next run, can we check whether the transcription exists and load
+it instead?"
+
+"Can we also reuse the downloaded video?"
+
+"Let's make sure the second run is noticeably faster."
+
+
+============================================================
+16. PROJECT PATHS
+============================================================
+
+"I'm starting to hardcode paths in several files. Can we clean this up?"
+
+"Can we create ProjectPaths based on the video ID?"
+
+"I want videos, transcriptions, and final frames to have predictable
+locations."
+
+"Let's keep all path construction in utils/paths.py."
+
+
+============================================================
+17. ERROR HANDLING
+============================================================
+
+"I want the application to fail gracefully instead of showing raw library
+exceptions."
+
+"Let's create exceptions.py with application-specific exceptions."
+
+"How should main.py handle a video download failure?"
+
+"What about a Whisper/transcription failure?"
+
+"Let's make sure the user gets a useful error message."
+
+
+============================================================
+18. TESTING THE ERROR PATH
+============================================================
+
+"How can I test a download failure without actually relying on the network
+to fail?"
+
+"Can we mock yt-dlp and make it raise an exception?"
+
+"The test is showing the VideoDownloadError traceback. Is that expected,
+or is the test actually failing?"
+
+"Let's make sure the test verifies the custom exception correctly."
+
+
+============================================================
+19. FIXING THE DIALOGUE-NOT-FOUND TEST
+============================================================
+
+"My dialogue-not-found test is failing. It returns a result with score
+0.25 even though the sentence is completely different."
+
+"Should the matcher reject results below a confidence threshold?"
+
+"Let's make sure a valid match still passes while an unrelated sentence
+returns None."
+
+"Okay, now all the speech matching tests pass."
+
+
+============================================================
+20. FIXING THE IMPORT PROBLEM
+============================================================
+
+"When I run unittest discover, some tests can't import modules such as
+speech and localization."
+
+"Why does main.py work but the tests don't?"
+
+"I don't want to add random sys.path modifications everywhere."
+
+"What's the clean way to handle the src package structure?"
+
+"Let's fix the package imports and then run the complete test suite."
+
+
+============================================================
+21. H.264 WARNINGS
+============================================================
+
+"I'm getting H.264 warnings from OpenCV/FFmpeg such as 'Missing reference
+picture'. What do these actually mean?"
+
+"Are these warnings causing the application to fail, or are they decoder
+warnings?"
+
+"I don't want to suppress errors blindly. How can I check whether they are
+actually affecting frame extraction?"
+
+"If the application still extracts the correct frame, should we leave the
+warnings alone?"
+
+
+============================================================
+22. DEBUGGING THE -1 FPS ISSUE
+============================================================
+
+"My frame extraction script is suddenly showing FPS as -1 and the frame
+number is negative."
+
+"Could the video path be wrong?"
+
+"I recently changed the project to store videos using the video ID. Let's
+check whether this script is still using the old hardcoded video path."
+
+"Okay, it was using data/videos/quest1.mp4 while the actual video is now
+data/videos/248244667877.mp4. So the frame mapping code wasn't the problem."
+
+
+============================================================
+23. CLEANING UP THE PROJECT
+============================================================
+
+"I have a lot of small scripts under src that I created while testing each
+component."
+
+"Now that I have a proper tests directory, which files are actually still
+needed?"
+
+"Before deleting anything, can we search for references to the test files?"
+
+"I don't want to accidentally delete something required by the final
+pipeline."
+
+"Let's keep production modules under src and automated tests under tests."
+
+
+============================================================
+24. REQUIREMENTS.TXT
+============================================================
+
+"I ran pip freeze and got a huge requirements.txt. Which packages are
+actually needed by my project?"
+
+"Do I need both opencv-python and opencv-python-headless?"
+
+"I want the requirements file to be clean enough for someone else to
+install the project."
+
+"Let's make sure the dependencies required by Whisper, EasyOCR, OpenCV and
+yt-dlp are included."
+
+
+============================================================
+25. MAKING THE CLI REUSABLE
+============================================================
+
+"My main.py currently has the video URL and target dialogue hardcoded."
+
+"I want the interviewer to be able to give me a different URL and dialogue
+without changing the code."
+
+"Can we make it work like:
+
+python src/main.py '<video_url>' '<dialogue>'"
+
+"Would argparse be better than manually reading sys.argv?"
+
+"Let's add --help as well."
+
+
+============================================================
+26. TESTING MULTIPLE VIDEO SOURCES
+============================================================
+
+"The application currently works with the OK.ru demo URL. I want to make
+the URL handling more reusable."
+
+"Can we support YouTube URLs as well?"
+
+"My current video_id.py only understands /video/<id>. How should we handle
+a YouTube watch URL like https://www.youtube.com/watch?v=R8SE3RxqaTY?"
+
+"Let's add tests for both YouTube and OK.ru URL extraction."
+
+"The YouTube ID extraction works, but yt-dlp is returning a 429/bot
+verification error. Is that an application problem or an external
+platform restriction?"
+
+
+============================================================
+27. IMPROVING VIDEO DOWNLOAD RELIABILITY
+============================================================
+
+"Tomorrow the interviewer might give me another OK.ru URL, so I don't want
+the downloader to fail because of a temporary connection issue."
+
+"The same OK.ru URL fails even when I run yt-dlp directly, so let's first
+understand whether the issue is in our code."
+
+"Can retries help with connection failures?"
+
+"Would a browser-like User-Agent make the request more compatible?"
+
+"Let's add retries and a browser-like User-Agent to yt-dlp without changing
+the rest of the application."
+
+"Good, the previously failing OK.ru video has started downloading now."
+
+
+============================================================
+28. QUESTIONING THE PIPELINE DESIGN
+============================================================
+
+"Are speech and OCR actually running in parallel in our current design?"
+
+"If not, why did we choose sequential processing?"
+
+"Wouldn't it be cheaper to let speech find the approximate timestamp first
+and then only run OCR around that timestamp?"
+
+"So the actual pipeline is:
+
+video
+→ speech
+→ dialogue timestamp
+→ OCR around timestamp
+→ fusion
+→ final frame
+
+rather than running both over the entire video?"
+
+"Let's keep the sequential approach because speech significantly reduces
+the OCR search space."
+
+
+============================================================
+29. FINAL TESTING
+============================================================
+
+"Let's run the complete unit test suite now."
+
+"Are all the important components covered?"
+
+"I want tests for speech matching, word alignment, OCR matching, fusion,
+frame saving, visual search, and download errors."
+
+"Let's also run the actual application end-to-end after the tests pass."
+
+"Don't add unnecessary features now. I want to focus on making the current
+pipeline reliable for the final demo."
+
+
+============================================================
+30. DOCUMENTATION
+============================================================
+
+"The README is becoming too large. I think we should separate the
+documentation."
+
+"I want README.md to answer only:
+
+What is this?
+How do I install it?
+How do I run it?
+
+Then APPROACH.md should explain:
+
+How did I engineer it?
+Why did I choose this approach?
+What trade-offs did I make?
+
+And prompts.txt should show how AI was used during development."
+
+"Let's keep the README short and move the engineering reasoning into
+APPROACH.md."
+
+
+============================================================
+31. FINAL REVIEW
+============================================================
+
+"The application is working end-to-end now. Before the final demo, what
+should I verify?"
+
+"Let's check:
+
+- clean project structure
+- requirements.txt
+- CLI input
+- cached transcription
+- video caching
+- speech localization
+- word alignment
+- OCR search
+- OCR fallback
+- fusion
+- frame mapping
+- frame saving
+- error handling
+- unit tests
+
+What else is actually necessary?"
+
+"I don't want to add features just for the sake of adding them."
+
+
+============================================================
+DEVELOPMENT STYLE
+============================================================
+
+The general pattern of using AI during development was:
+
+1. Start with an idea.
+2. Ask whether the idea is practical.
+3. Break it into smaller components.
+4. Implement one component.
+5. Run the code.
+6. Bring the actual error/output back into the discussion.
+7. Understand the root cause.
+8. Fix the smallest relevant part.
+9. Add a test for the behavior.
+10. Measure performance when necessary.
+11. Improve the design.
+12. Validate the complete pipeline.
+
+
+============================================================
+FINAL PROJECT PIPELINE
+============================================================
+
+Video URL
+    ↓
+Video acquisition
+    ↓
+Cached local video
+    ↓
+Speech transcription
+    ↓
+Fuzzy dialogue matching
+    ↓
+Word-level alignment
+    ↓
+Candidate timestamp
+    ↓
+Small visual search window
+    ↓
+OCR coarse search
+    ↓
+OCR fine search
+    ↓
+Speech / visual fusion
+    ↓
+Final timestamp
+    ↓
+Timestamp → frame
+    ↓
+Save target frame
+
+
+============================================================
+AI USAGE
+============================================================
+
+AI was not used to generate the entire project as a single request.
+
+It was used throughout development for:
+
+- brainstorming
+- architecture discussions
+- understanding libraries
+- implementation guidance
+- debugging
+- test design
+- edge-case analysis
+- performance discussions
+- code organization
+- documentation
+
+The final implementation was validated by actually running the application
+and by automated tests.
