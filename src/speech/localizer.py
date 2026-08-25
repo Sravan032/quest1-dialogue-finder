@@ -1,5 +1,7 @@
 from difflib import SequenceMatcher
 from faster_whisper import WhisperModel
+import json
+from pathlib import Path
 
 
 class SpeechLocalizer:
@@ -40,7 +42,60 @@ class SpeechLocalizer:
             word_timestamps=True
         )
 
-        return list(segments)
+        results = []
+
+        for segment in segments:
+
+            words = []
+
+            if segment.words:
+                for word in segment.words:
+                    words.append({
+                        "word": word.word,
+                        "start": word.start,
+                        "end": word.end
+                    })
+
+            results.append({
+                "start": segment.start,
+                "end": segment.end,
+                "text": segment.text.strip(),
+                "words": words
+            })
+
+        return results
+
+    def save_transcription(self, segments, output_path):
+
+        output_path = Path(output_path)
+
+        output_path.parent.mkdir(
+            parents=True,
+            exist_ok=True
+        )
+
+        with open(
+            output_path,
+            "w",
+            encoding="utf-8"
+        ) as file:
+
+            json.dump(
+                segments,
+                file,
+                indent=2,
+                ensure_ascii=False
+            )
+
+    def load_transcription(self, input_path):
+
+        with open(
+            input_path,
+            "r",
+            encoding="utf-8"
+        ) as file:
+
+            return json.load(file)
 
     def find_dialogue(self, segments, target):
 
@@ -51,7 +106,7 @@ class SpeechLocalizer:
 
             score = self.similarity(
                 target,
-                segment.text
+                segment["text"]
             )
 
             if score > best_score:
@@ -63,8 +118,8 @@ class SpeechLocalizer:
 
         return {
             "score": best_score,
-            "start": best_segment.start,
-            "end": best_segment.end,
-            "text": best_segment.text.strip(),
-            "words": best_segment.words
+            "start": best_segment["start"],
+            "end": best_segment["end"],
+            "text": best_segment["text"],
+            "words": best_segment["words"]
         }
