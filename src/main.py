@@ -44,6 +44,12 @@ def parse_arguments():
 
     return parser.parse_args()
 
+def format_timestamp(seconds):
+    minutes = int(seconds // 60)
+    remaining_seconds = seconds % 60
+
+    return f"{minutes:02d}:{remaining_seconds:06.3f}"
+
 def main():
 
     args = parse_arguments()
@@ -344,7 +350,8 @@ def main():
 
     print(
         f"Timestamp       : "
-        f"{final_result['timestamp']:.3f}s"
+        f"{final_result['timestamp']:.3f}s "
+        f"({format_timestamp(final_result['timestamp'])})"
     )
 
     print(
@@ -354,7 +361,8 @@ def main():
 
     print(
         f"Frame timestamp : "
-        f"{actual_timestamp:.3f}s"
+        f"{actual_timestamp:.3f}s "
+        f"({format_timestamp(actual_timestamp)})"
     )
 
     print(
