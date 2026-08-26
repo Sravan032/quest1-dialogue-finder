@@ -4,6 +4,9 @@ import json
 from pathlib import Path
 from src.speech.aligner import WordAligner
 from src.core.exceptions import TranscriptionError
+import subprocess
+import tempfile
+import cv2
 
 class SpeechLocalizer:
 
@@ -36,39 +39,154 @@ class SpeechLocalizer:
             self.normalize(text2)
         ).ratio()
 
-    def transcribe(self, video_path):
-        try:
-            segments, info = self.model.transcribe(
-                video_path,
-                beam_size=5,
-                word_timestamps=True
+    def _get_duration(self, video_path):
+
+        cap = cv2.VideoCapture(
+            str(video_path)
+        )
+
+        if not cap.isOpened():
+            raise ValueError(
+                f"Could not open video: {video_path}"
             )
+
+        fps = cap.get(
+            cv2.CAP_PROP_FPS
+        )
+
+        frame_count = cap.get(
+            cv2.CAP_PROP_FRAME_COUNT
+        )
+
+        cap.release()
+
+        if fps <= 0:
+            raise ValueError(
+                "Invalid video FPS"
+            )
+
+        return frame_count / fps
+
+    def _extract_audio_chunk(
+        self,
+        video_path,
+        output_path,
+        start_time,
+        end_time
+    ):
+
+        duration = end_time - start_time
+
+        command = [
+            "ffmpeg",
+            "-y",
+            "-ss",
+            str(start_time),
+            "-i",
+            str(video_path),
+            "-t",
+            str(duration),
+            "-vn",
+            "-ac",
+            "1",
+            "-ar",
+            "16000",
+            "-acodec",
+            "pcm_s16le",
+            str(output_path)
+        ]
+
+        result = subprocess.run(
+            command,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True
+        )
+
+        if result.returncode != 0:
+
+            raise RuntimeError(
+                "FFmpeg audio extraction failed: "
+                + result.stderr[-1000:]
+            )
+
+    def transcribe(self, video_path, chunk_duration=600):
+
+        results = []
+
+        try:
+
+            duration = self._get_duration(video_path)
+
+            with tempfile.TemporaryDirectory() as temp_dir:
+
+                chunk_start = 0
+
+                while chunk_start < duration:
+
+                    chunk_end = min(
+                        chunk_start + chunk_duration,
+                        duration
+                    )
+
+                    audio_path = (
+                        Path(temp_dir)
+                        / f"chunk_{chunk_start}.wav"
+                    )
+
+                    self._extract_audio_chunk(
+                        video_path,
+                        audio_path,
+                        chunk_start,
+                        chunk_end
+                    )
+
+                    segments, info = self.model.transcribe(
+                        str(audio_path),
+                        beam_size=5,
+                        word_timestamps=True
+                    )
+
+                    for segment in segments:
+
+                        words = []
+
+                        if segment.words:
+
+                            for word in segment.words:
+
+                                words.append({
+                                    "word": word.word,
+                                    "start": (
+                                        word.start
+                                        + chunk_start
+                                    ),
+                                    "end": (
+                                        word.end
+                                        + chunk_start
+                                    )
+                                })
+
+                        results.append({
+                            "start": (
+                                segment.start
+                                + chunk_start
+                            ),
+                            "end": (
+                                segment.end
+                                + chunk_start
+                            ),
+                            "text": segment.text.strip(),
+                            "words": words
+                        })
+
+                    chunk_start += chunk_duration
+
         except Exception as e:
 
             raise TranscriptionError(
                 f"Transcription failed: {e}"
             ) from e
-
-        results = []
-
-        for segment in segments:
-
-            words = []
-
-            if segment.words:
-                for word in segment.words:
-                    words.append({
-                        "word": word.word,
-                        "start": word.start,
-                        "end": word.end
-                    })
-
-            results.append({
-                "start": segment.start,
-                "end": segment.end,
-                "text": segment.text.strip(),
-                "words": words
-            })
 
         return results
 

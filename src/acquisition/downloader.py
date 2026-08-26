@@ -21,16 +21,19 @@ class VideoDownloader:
         ) + ".%(ext)s"
 
         options = {
-            "format": "best[ext=mp4]/best",
+            "format": (
+                "bestvideo+bestaudio/"
+                "bestvideo[ext=mp4]+bestaudio[ext=m4a]/"
+                "bestvideo+bestaudio[ext=m4a]/"
+                "best"
+            ),
             "outtmpl": output_template,
             "merge_output_format": "mp4",
             "noplaylist": True,
 
-            # Network robustness
             "retries": 5,
             "fragment_retries": 5,
 
-            # Use a normal browser-like user agent
             "http_headers": {
                 "User-Agent": (
                     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
