@@ -13,7 +13,11 @@ Video URL
     ↓
 Video Acquisition
     ↓
-Speech Transcription
+FFmpeg audio chunking
+    ↓
+Chunked Whisper transcription
+    ↓
+Combined timestamped segments
     ↓
 Dialogue Matching
     ↓
@@ -79,6 +83,36 @@ For example:
 Therefore, the implementation normalizes the text and uses `SequenceMatcher` for fuzzy similarity. The best matching window of transcription segments is selected. A minimum similarity threshold prevents unrelated dialogue from being accepted.
 
 ---
+
+## Long Video Transcription
+
+A single Whisper transcription over a very long video can require substantial
+memory because the underlying audio stream may be loaded and processed as a
+large array.
+
+During testing with a longer OK.ru video, the original approach failed with
+a memory allocation error.
+
+The transcription stage was therefore changed to process the audio in
+manageable chunks using FFmpeg.
+
+```text
+Long Video
+    ↓
+FFmpeg
+    ↓
+10-minute audio chunk
+    ↓
+Whisper
+    ↓
+Next chunk
+    ↓
+Whisper
+    ↓
+...
+    ↓
+Combined transcription
+```
 
 ## 4. Word-Level Alignment
 
