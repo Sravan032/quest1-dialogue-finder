@@ -20,6 +20,12 @@ The application accepts a video URL and target dialogue, then combines speech tr
 - Error handling
 - Automated unit tests
 
+### Long Video Handling
+
+Long videos are processed in audio chunks before transcription rather than
+loading the entire audio stream into memory at once. This keeps memory usage
+bounded and makes the transcription pipeline more robust for longer videos.
+
 ## Requirements
 
 - Python 3.x
