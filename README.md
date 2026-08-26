@@ -67,13 +67,13 @@ pip install -r requirements.txt
 Run the application with a video URL and target dialogue:
 
 ```bash
-python src/main.py "<video_url>" "<dialogue>"
+python -m src.main "VIDEO_URL" "TARGET_DIALOGUE"
 ```
 
 ### Example
 
 ```bash
-python src/main.py "https://ok.ru/video/248244667877" "My mind rebels at stagnation"
+python -m src.main "https://ok.ru/video/248244667877" "My mind rebels at stagnation"
 ```
 
 To view the available command-line options:
